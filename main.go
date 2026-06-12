@@ -241,7 +241,7 @@ func (a *app) openDiff() {
 }
 
 func loadDiff(path string) (string, error) {
-	out, err := exec.Command("git", "diff", "--unified=1000000", "HEAD", "--", path).CombinedOutput()
+	out, err := exec.Command("git", "diff", "--no-color", "--unified=1000000", "HEAD", "--", path).CombinedOutput()
 	if err != nil {
 		return "", fmt.Errorf("git diff failed: %s", strings.TrimSpace(string(out)))
 	}
@@ -381,7 +381,9 @@ func (a *app) writeDiffContent(view *gocui.View) {
 	if a.scroll > 0 {
 		lines = lines[a.scroll:]
 	}
-	fmt.Fprint(view, strings.Join(lines, "\n"))
+	for _, line := range lines {
+		fmt.Fprintln(view, colorDiffLine(renderableLine(line)))
+	}
 }
 
 func oldSource(diff string) string {
@@ -431,4 +433,23 @@ func fitLine(line string, width int) string {
 		return line[:width]
 	}
 	return line[:width-1] + "~"
+}
+
+func renderableLine(line string) string {
+	return strings.ReplaceAll(line, "\t", "    ")
+}
+
+func colorDiffLine(line string) string {
+	switch {
+	case strings.HasPrefix(line, "+") && !strings.HasPrefix(line, "+++"):
+		return "\x1b[32m" + line + "\x1b[0m"
+	case strings.HasPrefix(line, "-") && !strings.HasPrefix(line, "---"):
+		return "\x1b[31m" + line + "\x1b[0m"
+	case strings.HasPrefix(line, "@@"):
+		return "\x1b[36m" + line + "\x1b[0m"
+	case strings.HasPrefix(line, "diff --git"), strings.HasPrefix(line, "index "), strings.HasPrefix(line, "---"), strings.HasPrefix(line, "+++"):
+		return "\x1b[36m" + line + "\x1b[0m"
+	default:
+		return line
+	}
 }
