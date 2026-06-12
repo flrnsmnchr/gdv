@@ -7,6 +7,8 @@ import (
 	"os"
 	"os/exec"
 	"strings"
+
+	"github.com/jroimartin/gocui"
 )
 
 type mode int
@@ -31,15 +33,14 @@ type fileEntry struct {
 }
 
 type app struct {
-	files      []fileEntry
-	selected   int
-	mode       mode
-	side       sideMode
-	diff       string
-	scroll     int
-	statusMsg  string
-	screenRows int
-	screenCols int
+	files     []fileEntry
+	selected  int
+	mode      mode
+	side      sideMode
+	diff      string
+	scroll    int
+	statusMsg string
+	gui       *gocui.Gui
 }
 
 func main() {
@@ -61,28 +62,22 @@ func run() error {
 
 	state := &app{files: files}
 
-	restore, err := enableRawMode()
+	gui, err := gocui.NewGui(gocui.OutputNormal)
 	if err != nil {
 		return err
 	}
-	defer restore()
+	defer gui.Close()
 
-	hideCursor()
-	defer showCursor()
-	defer clearScreen()
+	state.gui = gui
+	gui.SetManagerFunc(state.layout)
 
-	for {
-		state.screenRows, state.screenCols = terminalSize()
-		state.draw()
-
-		key, err := readKey(os.Stdin)
-		if err != nil {
-			return err
-		}
-		if state.handleKey(key) {
-			return nil
-		}
+	if err := state.setKeybindings(); err != nil {
+		return err
 	}
+	if err := gui.MainLoop(); err != nil && err != gocui.ErrQuit {
+		return err
+	}
+	return nil
 }
 
 func ensureGitRepo() error {
@@ -99,6 +94,49 @@ func loadStatus() ([]fileEntry, error) {
 		return nil, fmt.Errorf("git status failed: %w", err)
 	}
 	return parseStatus(out), nil
+}
+
+func (a *app) setKeybindings() error {
+	bindings := []struct {
+		key     interface{}
+		handler func(*gocui.Gui, *gocui.View) error
+	}{
+		{gocui.KeyCtrlC, a.quit},
+		{gocui.KeyEsc, a.quit},
+		{'q', a.key("q")},
+		{'j', a.key("j")},
+		{'f', a.key("f")},
+		{'k', a.key("k")},
+		{'d', a.key("d")},
+		{'h', a.key("h")},
+		{'s', a.key("s")},
+		{'l', a.key("l")},
+		{'g', a.key("g")},
+		{gocui.KeyArrowDown, a.key("down")},
+		{gocui.KeyArrowUp, a.key("up")},
+		{gocui.KeyEnter, a.key("enter")},
+		{gocui.KeySpace, a.key("space")},
+	}
+
+	for _, binding := range bindings {
+		if err := a.gui.SetKeybinding("", binding.key, gocui.ModNone, binding.handler); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (a *app) key(key string) func(*gocui.Gui, *gocui.View) error {
+	return func(g *gocui.Gui, v *gocui.View) error {
+		if a.handleKey(key) {
+			return gocui.ErrQuit
+		}
+		return nil
+	}
+}
+
+func (a *app) quit(g *gocui.Gui, v *gocui.View) error {
+	return gocui.ErrQuit
 }
 
 func parseStatus(out []byte) []fileEntry {
@@ -210,62 +248,121 @@ func loadDiff(path string) (string, error) {
 	return string(out), nil
 }
 
-func (a *app) draw() {
-	clearScreen()
-	if a.mode == statusMode {
-		a.drawStatus()
-		return
+func (a *app) layout(g *gocui.Gui) error {
+	maxX, maxY := g.Size()
+	if maxX < 20 || maxY < 8 {
+		return a.layoutSmall(g, maxX, maxY)
 	}
-	a.drawDiff()
+
+	if err := a.drawTitleView(g, maxX); err != nil {
+		return err
+	}
+	if err := a.drawMainView(g, maxX, maxY); err != nil {
+		return err
+	}
+	return a.drawStatusView(g, maxX, maxY)
 }
 
-func (a *app) drawStatus() {
-	fmt.Print(invert(" gdv "))
-	fmt.Print(" changed files")
-	if len(a.files) > 0 {
-		fmt.Printf(" (%d)", len(a.files))
+func (a *app) layoutSmall(g *gocui.Gui, maxX, maxY int) error {
+	view, err := g.SetView("main", 0, 0, maxX-1, maxY-1)
+	if err != nil && err != gocui.ErrUnknownView {
+		return err
 	}
-	fmt.Print("\r\n")
+	view.Title = " gdv "
+	view.Clear()
+	fmt.Fprintln(view, "Terminal too small")
+	return nil
+}
 
+func (a *app) drawTitleView(g *gocui.Gui, maxX int) error {
+	view, err := g.SetView("title", 0, 0, maxX-1, 2)
+	if err != nil && err != gocui.ErrUnknownView {
+		return err
+	}
+
+	view.Title = " gdv "
+	view.Clear()
+	if a.mode == statusMode {
+		fmt.Fprintf(view, "Changed files")
+		if len(a.files) > 0 {
+			fmt.Fprintf(view, " (%d)", len(a.files))
+		}
+		return nil
+	}
+
+	if a.selected >= 0 && a.selected < len(a.files) {
+		fmt.Fprint(view, a.files[a.selected].Path)
+	}
+	return nil
+}
+
+func (a *app) drawMainView(g *gocui.Gui, maxX, maxY int) error {
+	view, err := g.SetView("main", 0, 3, maxX-1, maxY-4)
+	if err != nil && err != gocui.ErrUnknownView {
+		return err
+	}
+
+	view.Title = " files "
+	if a.mode == diffMode {
+		view.Title = " diff "
+	}
+	view.Wrap = false
+	view.Clear()
+
+	if a.mode == statusMode {
+		a.writeStatusContent(view, maxY-8)
+		return nil
+	}
+	a.writeDiffContent(view)
+	return nil
+}
+
+func (a *app) drawStatusView(g *gocui.Gui, maxX, maxY int) error {
+	view, err := g.SetView("status", 0, maxY-3, maxX-1, maxY-1)
+	if err != nil && err != gocui.ErrUnknownView {
+		return err
+	}
+
+	view.Title = " keys "
+	view.Clear()
+	if a.mode == statusMode {
+		fmt.Fprint(view, "j/f/down move down  k/d/up move up  enter/space open diff  q/esc quit")
+		return nil
+	}
+	fmt.Fprint(view, "h old  l/g new  j/d/down scroll down  k/s/up scroll up  enter/space back  q/esc quit")
+	return nil
+}
+
+func (a *app) writeStatusContent(view *gocui.View, maxRows int) {
 	if len(a.files) == 0 {
-		fmt.Print("\r\nNo changed files.\r\n")
-		fmt.Print("\r\nq/Esc quit\r\n")
+		fmt.Fprintln(view, "No changed files.")
 		return
 	}
 
-	maxRows := a.screenRows - 3
 	start := 0
 	if maxRows > 0 && a.selected >= maxRows {
 		start = a.selected - maxRows + 1
 	}
 	for i := start; i < len(a.files); i++ {
-		if i >= start+maxRows {
+		if maxRows > 0 && i >= start+maxRows {
 			break
 		}
 		file := a.files[i]
-		line := fmt.Sprintf("%s %s", file.Status, file.Path)
-		if file.Old != "" {
-			line = fmt.Sprintf("%s %s -> %s", file.Status, file.Old, file.Path)
-		}
-		line = fitLine(line, a.screenCols)
+		prefix := "  "
 		if i == a.selected {
-			fmt.Print(invert(line))
-		} else {
-			fmt.Print(line)
+			prefix = "> "
 		}
-		fmt.Print("\r\n")
+		line := fmt.Sprintf("%s%s %s", prefix, file.Status, file.Path)
+		if file.Old != "" {
+			line = fmt.Sprintf("%s%s %s -> %s", prefix, file.Status, file.Old, file.Path)
+		}
+		fmt.Fprintln(view, line)
 	}
-	fmt.Print("\r\nj/f down  k/d up  enter/space diff  q quit\r\n")
 }
 
-func (a *app) drawDiff() {
-	file := a.files[a.selected]
-	title := fmt.Sprintf(" gdv %s ", file.Path)
-	fmt.Print(invert(fitLine(title, a.screenCols)))
-	fmt.Print("\r\n")
-
+func (a *app) writeDiffContent(view *gocui.View) {
 	if a.statusMsg != "" {
-		fmt.Print(a.statusMsg + "\r\n")
+		fmt.Fprintln(view, a.statusMsg)
 		return
 	}
 
@@ -278,15 +375,13 @@ func (a *app) drawDiff() {
 	}
 
 	lines := strings.Split(strings.ReplaceAll(content, "\r\n", "\n"), "\n")
-	maxRows := a.screenRows - 3
 	if a.scroll > len(lines)-1 {
 		a.scroll = max(0, len(lines)-1)
 	}
-	for i := a.scroll; i < len(lines) && i < a.scroll+maxRows; i++ {
-		fmt.Print(colorDiffLine(fitLine(lines[i], a.screenCols)))
-		fmt.Print("\r\n")
+	if a.scroll > 0 {
+		lines = lines[a.scroll:]
 	}
-	fmt.Print("\r\nh old  l/g new  j/d down  k/s up  enter/space back  q quit\r\n")
+	fmt.Fprint(view, strings.Join(lines, "\n"))
 }
 
 func oldSource(diff string) string {
@@ -324,19 +419,6 @@ func sideSource(diff string, marker byte) string {
 	return strings.Join(out, "\n")
 }
 
-func colorDiffLine(line string) string {
-	if strings.HasPrefix(line, "+") && !strings.HasPrefix(line, "+++") {
-		return "\x1b[32m" + line + "\x1b[0m"
-	}
-	if strings.HasPrefix(line, "-") && !strings.HasPrefix(line, "---") {
-		return "\x1b[31m" + line + "\x1b[0m"
-	}
-	if strings.HasPrefix(line, "@@") {
-		return "\x1b[36m" + line + "\x1b[0m"
-	}
-	return line
-}
-
 func fitLine(line string, width int) string {
 	if width <= 0 {
 		return line
@@ -349,20 +431,4 @@ func fitLine(line string, width int) string {
 		return line[:width]
 	}
 	return line[:width-1] + "~"
-}
-
-func clearScreen() {
-	fmt.Print("\x1b[2J\x1b[H")
-}
-
-func hideCursor() {
-	fmt.Print("\x1b[?25l")
-}
-
-func showCursor() {
-	fmt.Print("\x1b[?25h")
-}
-
-func invert(s string) string {
-	return "\x1b[7m" + s + "\x1b[0m"
 }
