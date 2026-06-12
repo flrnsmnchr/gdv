@@ -63,3 +63,24 @@ func TestSideViewKeysToggleBackToFullDiff(t *testing.T) {
 		t.Fatalf("side after second l = %v, want fullDiff", a.side)
 	}
 }
+
+func TestDiffViewScrollKeys(t *testing.T) {
+	a := &app{mode: diffMode}
+
+	a.handleKey("j")
+	a.handleKey("d")
+	if a.scroll != 2 {
+		t.Fatalf("scroll after j/d = %d, want 2", a.scroll)
+	}
+
+	a.handleKey("k")
+	a.handleKey("s")
+	if a.scroll != 0 {
+		t.Fatalf("scroll after k/s = %d, want 0", a.scroll)
+	}
+
+	a.handleKey("s")
+	if a.scroll != 0 {
+		t.Fatalf("scroll after s at top = %d, want 0", a.scroll)
+	}
+}

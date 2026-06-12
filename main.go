@@ -154,15 +154,15 @@ func (a *app) handleKey(key string) bool {
 	case "enter", "space":
 		a.mode = statusMode
 		a.statusMsg = ""
-	case "h", "s":
+	case "h":
 		a.toggleSide(oldSide)
 		a.scroll = 0
 	case "l", "g":
 		a.toggleSide(newSide)
 		a.scroll = 0
-	case "down":
+	case "j", "d", "down":
 		a.scroll++
-	case "up":
+	case "k", "s", "up":
 		if a.scroll > 0 {
 			a.scroll--
 		}
@@ -286,7 +286,7 @@ func (a *app) drawDiff() {
 		fmt.Print(colorDiffLine(fitLine(lines[i], a.screenCols)))
 		fmt.Print("\r\n")
 	}
-	fmt.Print("\r\nh/s old  l/g new  enter/space back  q quit\r\n")
+	fmt.Print("\r\nh old  l/g new  j/d down  k/s up  enter/space back  q quit\r\n")
 }
 
 func oldSource(diff string) string {
