@@ -42,14 +42,6 @@ index 111..222 100644
 	}
 }
 
-func TestContextDecreaseStopsAtZero(t *testing.T) {
-	a := &app{mode: diffMode, context: 0}
-	a.handleKey("k")
-	if a.context != 0 {
-		t.Fatalf("context = %d, want 0", a.context)
-	}
-}
-
 func TestSideViewKeysToggleBackToFullDiff(t *testing.T) {
 	a := &app{mode: diffMode}
 

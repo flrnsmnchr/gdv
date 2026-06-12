@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
-	"strconv"
 	"strings"
 )
 
@@ -36,7 +35,6 @@ type app struct {
 	selected   int
 	mode       mode
 	side       sideMode
-	context    int
 	diff       string
 	scroll     int
 	statusMsg  string
@@ -61,10 +59,7 @@ func run() error {
 		return err
 	}
 
-	state := &app{
-		files:   files,
-		context: 3,
-	}
+	state := &app{files: files}
 
 	restore, err := enableRawMode()
 	if err != nil {
@@ -165,14 +160,6 @@ func (a *app) handleKey(key string) bool {
 	case "l", "g":
 		a.toggleSide(newSide)
 		a.scroll = 0
-	case "j", "f":
-		a.context++
-		a.openDiff()
-	case "k", "d":
-		if a.context > 0 {
-			a.context--
-			a.openDiff()
-		}
 	case "down":
 		a.scroll++
 	case "up":
@@ -202,7 +189,7 @@ func (a *app) openDiff() {
 	}
 
 	entry := a.files[a.selected]
-	diff, err := loadDiff(entry.Path, a.context)
+	diff, err := loadDiff(entry.Path)
 	if err != nil {
 		a.diff = ""
 		a.statusMsg = err.Error()
@@ -215,9 +202,8 @@ func (a *app) openDiff() {
 	a.diff = diff
 }
 
-func loadDiff(path string, context int) (string, error) {
-	arg := "-U" + strconv.Itoa(context)
-	out, err := exec.Command("git", "diff", arg, "HEAD", "--", path).CombinedOutput()
+func loadDiff(path string) (string, error) {
+	out, err := exec.Command("git", "diff", "--unified=1000000", "HEAD", "--", path).CombinedOutput()
 	if err != nil {
 		return "", fmt.Errorf("git diff failed: %s", strings.TrimSpace(string(out)))
 	}
@@ -274,7 +260,7 @@ func (a *app) drawStatus() {
 
 func (a *app) drawDiff() {
 	file := a.files[a.selected]
-	title := fmt.Sprintf(" gdv %s context=%d ", file.Path, a.context)
+	title := fmt.Sprintf(" gdv %s ", file.Path)
 	fmt.Print(invert(fitLine(title, a.screenCols)))
 	fmt.Print("\r\n")
 
@@ -300,7 +286,7 @@ func (a *app) drawDiff() {
 		fmt.Print(colorDiffLine(fitLine(lines[i], a.screenCols)))
 		fmt.Print("\r\n")
 	}
-	fmt.Print("\r\nh/s old  l/g new  j/f more ctx  k/d less ctx  enter/space back  q quit\r\n")
+	fmt.Print("\r\nh/s old  l/g new  enter/space back  q quit\r\n")
 }
 
 func oldSource(diff string) string {
