@@ -160,10 +160,10 @@ func (a *app) handleKey(key string) bool {
 		a.mode = statusMode
 		a.statusMsg = ""
 	case "h", "s":
-		a.side = oldSide
+		a.toggleSide(oldSide)
 		a.scroll = 0
 	case "l", "g":
-		a.side = newSide
+		a.toggleSide(newSide)
 		a.scroll = 0
 	case "j", "f":
 		a.context++
@@ -181,6 +181,14 @@ func (a *app) handleKey(key string) bool {
 		}
 	}
 	return false
+}
+
+func (a *app) toggleSide(side sideMode) {
+	if a.side == side {
+		a.side = fullDiff
+		return
+	}
+	a.side = side
 }
 
 func (a *app) openDiff() {

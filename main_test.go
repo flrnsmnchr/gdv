@@ -49,3 +49,25 @@ func TestContextDecreaseStopsAtZero(t *testing.T) {
 		t.Fatalf("context = %d, want 0", a.context)
 	}
 }
+
+func TestSideViewKeysToggleBackToFullDiff(t *testing.T) {
+	a := &app{mode: diffMode}
+
+	a.handleKey("h")
+	if a.side != oldSide {
+		t.Fatalf("side after h = %v, want oldSide", a.side)
+	}
+	a.handleKey("h")
+	if a.side != fullDiff {
+		t.Fatalf("side after second h = %v, want fullDiff", a.side)
+	}
+
+	a.handleKey("l")
+	if a.side != newSide {
+		t.Fatalf("side after l = %v, want newSide", a.side)
+	}
+	a.handleKey("l")
+	if a.side != fullDiff {
+		t.Fatalf("side after second l = %v, want fullDiff", a.side)
+	}
+}
