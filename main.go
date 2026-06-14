@@ -404,7 +404,6 @@ func sideSource(diff string, marker byte) string {
 			continue
 		}
 		if strings.HasPrefix(line, "@@") {
-			out = append(out, line)
 			continue
 		}
 		if line[0] == ' ' {

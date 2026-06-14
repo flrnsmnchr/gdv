@@ -32,12 +32,12 @@ index 111..222 100644
  tail`
 
 	old := oldSource(diff)
-	if old != "@@ -1,3 +1,3 @@\nsame\nold\ntail" {
+	if old != "same\nold\ntail" {
 		t.Fatalf("oldSource = %q", old)
 	}
 
 	new := newSource(diff)
-	if new != "@@ -1,3 +1,3 @@\nsame\nnew\ntail" {
+	if new != "same\nnew\ntail" {
 		t.Fatalf("newSource = %q", new)
 	}
 }

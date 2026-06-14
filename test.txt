@@ -1,3 +1,3 @@
-Change 1
 Change 3
 Removed line 2
+Removed line 1
