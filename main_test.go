@@ -92,6 +92,13 @@ func TestRenderableLineExpandsTabs(t *testing.T) {
 	}
 }
 
+func TestGitPathNormalizesWindowsSeparators(t *testing.T) {
+	got := gitPath(`dir\file.txt`)
+	if got != "dir/file.txt" {
+		t.Fatalf("gitPath = %q, want %q", got, "dir/file.txt")
+	}
+}
+
 func TestColorDiffLine(t *testing.T) {
 	tests := map[string]string{
 		"+added":  "\x1b[32m+added\x1b[0m",

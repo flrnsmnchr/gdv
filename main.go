@@ -38,6 +38,8 @@ type app struct {
 	mode      mode
 	side      sideMode
 	diff      string
+	oldFile   string
+	newFile   string
 	scroll    int
 	statusMsg string
 	gui       *gocui.Gui
@@ -238,6 +240,8 @@ func (a *app) openDiff() {
 		return
 	}
 	a.diff = diff
+	a.oldFile = loadOldFile(entry)
+	a.newFile = loadNewFile(entry)
 }
 
 func loadDiff(path string) (string, error) {
@@ -246,6 +250,34 @@ func loadDiff(path string) (string, error) {
 		return "", fmt.Errorf("git diff failed: %s", strings.TrimSpace(string(out)))
 	}
 	return string(out), nil
+}
+
+func loadOldFile(entry fileEntry) string {
+	path := entry.Path
+	if entry.Old != "" {
+		path = entry.Old
+	}
+	out, err := exec.Command("git", "show", "HEAD:"+gitPath(path)).CombinedOutput()
+	if err != nil {
+		msg := strings.TrimSpace(string(out))
+		if msg == "" {
+			msg = err.Error()
+		}
+		return "Unable to load old file from HEAD: " + msg
+	}
+	return string(out)
+}
+
+func loadNewFile(entry fileEntry) string {
+	out, err := os.ReadFile(entry.Path)
+	if err != nil {
+		return "Unable to load file from disk: " + err.Error()
+	}
+	return string(out)
+}
+
+func gitPath(path string) string {
+	return strings.ReplaceAll(path, "\\", "/")
 }
 
 func (a *app) layout(g *gocui.Gui) error {
@@ -369,9 +401,9 @@ func (a *app) writeDiffContent(view *gocui.View) {
 	content := a.diff
 	switch a.side {
 	case oldSide:
-		content = oldSource(a.diff)
+		content = a.oldFile
 	case newSide:
-		content = newSource(a.diff)
+		content = a.newFile
 	}
 
 	lines := strings.Split(strings.ReplaceAll(content, "\r\n", "\n"), "\n")
@@ -382,7 +414,11 @@ func (a *app) writeDiffContent(view *gocui.View) {
 		lines = lines[a.scroll:]
 	}
 	for _, line := range lines {
-		fmt.Fprintln(view, colorDiffLine(renderableLine(line)))
+		line = renderableLine(line)
+		if a.side == fullDiff {
+			line = colorDiffLine(line)
+		}
+		fmt.Fprintln(view, line)
 	}
 }
 
