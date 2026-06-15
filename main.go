@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"regexp"
+	"strconv"
 	"strings"
 
 	"github.com/jroimartin/gocui"
@@ -43,6 +45,11 @@ type app struct {
 	scroll    int
 	statusMsg string
 	gui       *gocui.Gui
+}
+
+type displayLine struct {
+	gutter string
+	text   string
 }
 
 func main() {
@@ -398,15 +405,7 @@ func (a *app) writeDiffContent(view *gocui.View) {
 		return
 	}
 
-	content := a.diff
-	switch a.side {
-	case oldSide:
-		content = a.oldFile
-	case newSide:
-		content = a.newFile
-	}
-
-	lines := strings.Split(strings.ReplaceAll(content, "\r\n", "\n"), "\n")
+	lines := a.diffDisplayLines()
 	if a.scroll > len(lines)-1 {
 		a.scroll = max(0, len(lines)-1)
 	}
@@ -414,11 +413,22 @@ func (a *app) writeDiffContent(view *gocui.View) {
 		lines = lines[a.scroll:]
 	}
 	for _, line := range lines {
-		line = renderableLine(line)
+		text := renderableLine(line.text)
 		if a.side == fullDiff {
-			line = colorDiffLine(line)
+			text = colorDiffLine(text)
 		}
-		fmt.Fprintln(view, line)
+		fmt.Fprintln(view, line.gutter+" "+text)
+	}
+}
+
+func (a *app) diffDisplayLines() []displayLine {
+	switch a.side {
+	case oldSide:
+		return numberedFileLines(a.oldFile, 1)
+	case newSide:
+		return numberedFileLines(a.newFile, 1)
+	default:
+		return numberedDiffLines(a.diff)
 	}
 }
 
@@ -472,6 +482,135 @@ func fitLine(line string, width int) string {
 
 func renderableLine(line string) string {
 	return strings.ReplaceAll(line, "\t", "    ")
+}
+
+func numberedFileLines(content string, start int) []displayLine {
+	lines := strings.Split(strings.ReplaceAll(content, "\r\n", "\n"), "\n")
+	width := numberWidth(start + len(lines) - 1)
+	out := make([]displayLine, 0, len(lines))
+	for i, line := range lines {
+		out = append(out, displayLine{
+			gutter: fmt.Sprintf("%*d", width, start+i),
+			text:   line,
+		})
+	}
+	return out
+}
+
+func numberedDiffLines(diff string) []displayLine {
+	lines := strings.Split(strings.ReplaceAll(diff, "\r\n", "\n"), "\n")
+	oldNo := 0
+	newNo := 0
+	maxNo := 0
+	for _, line := range lines {
+		if oldStart, newStart, ok := parseHunkHeader(line); ok {
+			if oldStart > oldNo {
+				oldNo = oldStart
+			}
+			if newStart > newNo {
+				newNo = newStart
+			}
+		}
+		if oldNo > maxNo {
+			maxNo = oldNo
+		}
+		if newNo > maxNo {
+			maxNo = newNo
+		}
+		switch {
+		case strings.HasPrefix(line, "@@"):
+			continue
+		case strings.HasPrefix(line, "diff --git"), strings.HasPrefix(line, "index "), strings.HasPrefix(line, "---"), strings.HasPrefix(line, "+++"):
+			continue
+		case len(line) == 0:
+			continue
+		case line[0] == ' ':
+			oldNo++
+			newNo++
+		case line[0] == '-':
+			oldNo++
+		case line[0] == '+':
+			newNo++
+		}
+	}
+
+	width := numberWidth(maxNo)
+	oldNo = 0
+	newNo = 0
+	out := make([]displayLine, 0, len(lines))
+	for _, line := range lines {
+		switch {
+		case strings.HasPrefix(line, "diff --git"), strings.HasPrefix(line, "index "), strings.HasPrefix(line, "---"), strings.HasPrefix(line, "+++"):
+			out = append(out, displayLine{gutter: blankDiffGutter(width), text: line})
+		case strings.HasPrefix(line, "@@"):
+			if oldStart, newStart, ok := parseHunkHeader(line); ok {
+				oldNo = oldStart
+				newNo = newStart
+			}
+			out = append(out, displayLine{gutter: blankDiffGutter(width), text: line})
+		case len(line) == 0:
+			out = append(out, displayLine{gutter: blankDiffGutter(width), text: line})
+		case line[0] == ' ':
+			out = append(out, displayLine{
+				gutter: fmt.Sprintf("%*d | %*d", width, oldNo, width, newNo),
+				text:   line,
+			})
+			oldNo++
+			newNo++
+		case line[0] == '-':
+			out = append(out, displayLine{
+				gutter: fmt.Sprintf("%*d | %*s", width, oldNo, width, ""),
+				text:   line,
+			})
+			oldNo++
+		case line[0] == '+':
+			out = append(out, displayLine{
+				gutter: fmt.Sprintf("%*s | %*d", width, "", width, newNo),
+				text:   line,
+			})
+			newNo++
+		default:
+			out = append(out, displayLine{gutter: blankDiffGutter(width), text: line})
+		}
+	}
+	return out
+}
+
+var hunkHeaderRE = regexp.MustCompile(`^@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@`)
+
+func parseHunkHeader(line string) (int, int, bool) {
+	match := hunkHeaderRE.FindStringSubmatch(line)
+	if len(match) != 3 {
+		return 0, 0, false
+	}
+	oldNo, err := strconv.Atoi(match[1])
+	if err != nil {
+		return 0, 0, false
+	}
+	newNo, err := strconv.Atoi(match[2])
+	if err != nil {
+		return 0, 0, false
+	}
+	return oldNo, newNo, true
+}
+
+func numberWidth(maxNo int) int {
+	if maxNo < 1 {
+		return 1
+	}
+	width := 0
+	for maxNo > 0 {
+		width++
+		maxNo /= 10
+	}
+	if width < 4 {
+		return 4
+	}
+	return width
+}
+
+func blankDiffGutter(width int) string {
+	return fmt.Sprintf("%*s | %*s", width, "", width, "")
 }
 
 func colorDiffLine(line string) string {

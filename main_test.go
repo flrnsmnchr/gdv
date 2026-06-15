@@ -99,6 +99,51 @@ func TestGitPathNormalizesWindowsSeparators(t *testing.T) {
 	}
 }
 
+func TestNumberedFileLines(t *testing.T) {
+	got := numberedFileLines("alpha\nbeta", 1)
+	if len(got) != 2 {
+		t.Fatalf("len = %d, want 2", len(got))
+	}
+	if got[0].gutter != "   1" || got[0].text != "alpha" {
+		t.Fatalf("first line = %#v", got[0])
+	}
+	if got[1].gutter != "   2" || got[1].text != "beta" {
+		t.Fatalf("second line = %#v", got[1])
+	}
+}
+
+func TestNumberedDiffLines(t *testing.T) {
+	diff := `diff --git a/a.txt b/a.txt
+index 111..222 100644
+--- a/a.txt
++++ b/a.txt
+@@ -1,3 +1,3 @@
+ same
+-old
++new
+ tail`
+
+	got := numberedDiffLines(diff)
+	if len(got) != 9 {
+		t.Fatalf("len = %d, want 9", len(got))
+	}
+	if got[4].text != "@@ -1,3 +1,3 @@" {
+		t.Fatalf("hunk header = %#v", got[4])
+	}
+	if got[5].gutter != "   1 |    1" || got[5].text != " same" {
+		t.Fatalf("context line = %#v", got[5])
+	}
+	if got[6].gutter != "   2 |     " || got[6].text != "-old" {
+		t.Fatalf("deleted line = %#v", got[6])
+	}
+	if got[7].gutter != "     |    2" || got[7].text != "+new" {
+		t.Fatalf("added line = %#v", got[7])
+	}
+	if got[8].gutter != "   3 |    3" || got[8].text != " tail" {
+		t.Fatalf("tail line = %#v", got[8])
+	}
+}
+
 func TestColorDiffLine(t *testing.T) {
 	tests := map[string]string{
 		"+added":  "\x1b[32m+added\x1b[0m",
