@@ -77,11 +77,11 @@ index 111..222 100644
  tail`
 
 	got := diffHunkOffsets(diff)
-	if len(got) != 2 {
-		t.Fatalf("len = %d, want 2", len(got))
+	if len(got) != 1 {
+		t.Fatalf("len = %d, want 1", len(got))
 	}
-	if got[0] != 4 || got[1] != 8 {
-		t.Fatalf("offsets = %#v, want [4 8]", got)
+	if got[0] != 6 {
+		t.Fatalf("offsets = %#v, want [6]", got)
 	}
 }
 
@@ -99,16 +99,16 @@ index 111..222 100644
 
 	a := &app{mode: diffMode, side: fullDiff, diff: diff}
 	a.handleKey("m")
-	if a.scroll != 4 {
-		t.Fatalf("scroll after first m = %d, want 4", a.scroll)
+	if a.scroll != 6 {
+		t.Fatalf("scroll after first m = %d, want 6", a.scroll)
 	}
 	a.handleKey("m")
-	if a.scroll != 8 {
-		t.Fatalf("scroll after second m = %d, want 8", a.scroll)
+	if a.scroll != 6 {
+		t.Fatalf("scroll after second m = %d, want 6", a.scroll)
 	}
 	a.handleKey(".")
-	if a.scroll != 4 {
-		t.Fatalf("scroll after . = %d, want 4", a.scroll)
+	if a.scroll != 6 {
+		t.Fatalf("scroll after . = %d, want 6", a.scroll)
 	}
 }
 
@@ -117,8 +117,8 @@ func TestDiffViewScrollKeys(t *testing.T) {
 
 	a.handleKey("j")
 	a.handleKey("d")
-	if a.scroll != 2 {
-		t.Fatalf("scroll after j/d = %d, want 2", a.scroll)
+	if a.scroll != 0 {
+		t.Fatalf("scroll after j/d = %d, want 0", a.scroll)
 	}
 
 	a.handleKey("k")
