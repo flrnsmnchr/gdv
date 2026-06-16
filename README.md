@@ -6,12 +6,13 @@ gdv is a minimal terminal-based Git change viewer written in Go. It shows change
 
 - Lists modified files from `git status --porcelain`
 - Opens file diffs with `git diff HEAD`
-- Supports side views for old/new file contents
-- Keyboard controls for navigation and exit
+- Supports full diff and old/new side views
+- Scrolls diff output and jumps between hunks
+- Keyboard controls for navigation, diff browsing, and exit
 
 ## Installation
 
-1. Ensure Go 1.26+ is installed.
+1. Ensure Go 1.26+ is installed and `git` is available in `PATH`.
 2. Clone the repository or place the code in a directory.
 3. Run:
 
@@ -22,7 +23,7 @@ go install ./...
 Or build a local binary:
 
 ```bash
-go build -o gdv
+go build -o gdv .
 ```
 
 ## Usage
@@ -37,9 +38,13 @@ Keyboard controls:
 
 - `j`, `f`, `down` — move down in file list
 - `k`, `d`, `up` — move up in file list
-- `enter`, `space` — open selected file diff / return to file list
-- `h` — show old file contents
-- `l`, `g` — show new file contents
+- `enter`, `space` — open selected diff / return to file list
+- `h`, `s` — show old file contents / toggle old side view
+- `l`, `g` — show new file contents / toggle new side view
+- `m`, `v` — jump to next diff hunk
+- `,`, `c` — jump to previous diff hunk
+- `j`, `d`, `down` — scroll diff down
+- `k`, `s`, `up` — scroll diff up
 - `q`, `esc`, `Ctrl+C` — quit
 
 ## Testing
