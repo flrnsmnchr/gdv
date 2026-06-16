@@ -121,6 +121,8 @@ func (a *app) setKeybindings() error {
 		{'s', a.key("s")},
 		{'l', a.key("l")},
 		{'g', a.key("g")},
+		{'m', a.key("m")},
+		{'.', a.key(".")},
 		{gocui.KeyArrowDown, a.key("down")},
 		{gocui.KeyArrowUp, a.key("up")},
 		{gocui.KeyEnter, a.key("enter")},
@@ -207,6 +209,10 @@ func (a *app) handleKey(key string) bool {
 	case "l", "g":
 		a.toggleSide(newSide)
 		a.scroll = 0
+	case "m":
+		a.nextHunk()
+	case ".":
+		a.previousHunk()
 	case "j", "d", "down":
 		a.scroll++
 	case "k", "s", "up":
@@ -215,6 +221,59 @@ func (a *app) handleKey(key string) bool {
 		}
 	}
 	return false
+}
+
+func (a *app) nextHunk() {
+	if a.mode != diffMode || a.side != fullDiff || a.diff == "" {
+		return
+	}
+	offsets := diffHunkOffsets(a.diff)
+	for _, off := range offsets {
+		if off > a.scroll {
+			a.scroll = off
+			return
+		}
+	}
+}
+
+func (a *app) previousHunk() {
+	if a.mode != diffMode || a.side != fullDiff || a.diff == "" {
+		return
+	}
+	offsets := diffHunkOffsets(a.diff)
+	previous := -1
+	for _, off := range offsets {
+		if off >= a.scroll {
+			break
+		}
+		previous = off
+	}
+	if previous >= 0 {
+		a.scroll = previous
+	}
+}
+
+func diffHunkOffsets(diff string) []int {
+	lines := strings.Split(strings.ReplaceAll(diff, "\r\n", "\n"), "\n")
+	offsets := make([]int, 0, 4)
+	for i, line := range lines {
+		if len(line) == 0 {
+			continue
+		}
+		if (strings.HasPrefix(line, "+") || strings.HasPrefix(line, "-")) &&
+			!strings.HasPrefix(line, "+++") && !strings.HasPrefix(line, "---") {
+			// start of a block if first line or previous line isn't a change
+			if i == 0 {
+				offsets = append(offsets, i)
+			} else {
+				prev := lines[i-1]
+				if !(strings.HasPrefix(prev, "+") || strings.HasPrefix(prev, "-")) {
+					offsets = append(offsets, i)
+				}
+			}
+		}
+	}
+	return offsets
 }
 
 func (a *app) toggleSide(side sideMode) {
@@ -368,7 +427,7 @@ func (a *app) drawStatusView(g *gocui.Gui, maxX, maxY int) error {
 		fmt.Fprint(view, "j/f/down move down  k/d/up move up  enter/space open diff  q/esc quit")
 		return nil
 	}
-	fmt.Fprint(view, "h old  l/g new  j/d/down scroll down  k/s/up scroll up  enter/space back  q/esc quit")
+	fmt.Fprint(view, "h old  l/g new  m next hunk  . prev hunk  j/d/down scroll down  k/s/up scroll up  enter/space back  q/esc quit")
 	return nil
 }
 

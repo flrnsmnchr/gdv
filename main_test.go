@@ -64,6 +64,54 @@ func TestSideViewKeysToggleBackToFullDiff(t *testing.T) {
 	}
 }
 
+func TestDiffHunkOffsets(t *testing.T) {
+	diff := `diff --git a/a.txt b/a.txt
+index 111..222 100644
+--- a/a.txt
++++ b/a.txt
+@@ -1,1 +1,1 @@
+ same
+-old
++new
+@@ -5,1 +5,1 @@
+ tail`
+
+	got := diffHunkOffsets(diff)
+	if len(got) != 2 {
+		t.Fatalf("len = %d, want 2", len(got))
+	}
+	if got[0] != 4 || got[1] != 8 {
+		t.Fatalf("offsets = %#v, want [4 8]", got)
+	}
+}
+
+func TestDiffHunkNavigation(t *testing.T) {
+	diff := `diff --git a/a.txt b/a.txt
+index 111..222 100644
+--- a/a.txt
++++ b/a.txt
+@@ -1,1 +1,1 @@
+ same
+-old
++new
+@@ -5,1 +5,1 @@
+ tail`
+
+	a := &app{mode: diffMode, side: fullDiff, diff: diff}
+	a.handleKey("m")
+	if a.scroll != 4 {
+		t.Fatalf("scroll after first m = %d, want 4", a.scroll)
+	}
+	a.handleKey("m")
+	if a.scroll != 8 {
+		t.Fatalf("scroll after second m = %d, want 8", a.scroll)
+	}
+	a.handleKey(".")
+	if a.scroll != 4 {
+		t.Fatalf("scroll after . = %d, want 4", a.scroll)
+	}
+}
+
 func TestDiffViewScrollKeys(t *testing.T) {
 	a := &app{mode: diffMode}
 
