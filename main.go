@@ -122,7 +122,9 @@ func (a *app) setKeybindings() error {
 		{'l', a.key("l")},
 		{'g', a.key("g")},
 		{'m', a.key("m")},
-		{'.', a.key(".")},
+		{',', a.key(",")},
+		{'v', a.key("v")},
+		{'c', a.key("c")},
 		{gocui.KeyArrowDown, a.key("down")},
 		{gocui.KeyArrowUp, a.key("up")},
 		{gocui.KeyEnter, a.key("enter")},
@@ -203,19 +205,19 @@ func (a *app) handleKey(key string) bool {
 	case "enter", "space":
 		a.mode = statusMode
 		a.statusMsg = ""
-	case "h":
+	case "h", "s":
 		a.toggleSide(oldSide)
 		a.scroll = 0
 	case "l", "g":
 		a.toggleSide(newSide)
 		a.scroll = 0
-	case "m":
+	case "m", "v":
 		a.nextHunk()
-	case ".":
+	case ",", "c":
 		a.previousHunk()
-	case "j", "d", "down":
+	case "j", "f", "down":
 		a.scroll++
-	case "k", "s", "up":
+	case "k", "d", "up":
 		if a.scroll > 0 {
 			a.scroll--
 		}
