@@ -288,31 +288,43 @@ func diffHunkOffsets(diff string) []int {
 
 func (a *app) toggleSide(side sideMode) {
 	if a.side == side {
-		a.side = fullDiff
+		// switch back to fullDiff, but map scroll from current side
+		a.switchToSide(fullDiff)
 		return
 	}
 	a.switchToSide(side)
 }
 
 func (a *app) switchToSide(side sideMode) {
-	switch side {
-	case oldSide:
-		if a.side == fullDiff && !a.oldScrollSet {
+	prev := a.side
+	prevScroll := a.currentScroll()
+
+	switch {
+	case prev == fullDiff && side != fullDiff:
+		// diff -> side
+		if side == oldSide {
 			a.oldScroll = a.diffScrollToSideScroll(oldSide)
 			a.oldScrollSet = true
-		} else if a.side == newSide && !a.oldScrollSet {
-			a.oldScroll = a.sideScrollToSideScroll(newSide, a.newScroll, oldSide)
-			a.oldScrollSet = true
-		}
-	case newSide:
-		if a.side == fullDiff && !a.newScrollSet {
+		} else if side == newSide {
 			a.newScroll = a.diffScrollToSideScroll(newSide)
 			a.newScrollSet = true
-		} else if a.side == oldSide && !a.newScrollSet {
-			a.newScroll = a.sideScrollToSideScroll(oldSide, a.oldScroll, newSide)
+		}
+	case prev != fullDiff && side == fullDiff:
+		// side -> diff
+		a.diffScroll = a.sideScrollToDiffScroll(prev, prevScroll)
+	case prev != fullDiff && side != fullDiff:
+		// side -> other side (map via diff)
+		if side == oldSide {
+			a.oldScroll = a.sideScrollToSideScroll(prev, prevScroll, oldSide)
+			a.oldScrollSet = true
+		} else if side == newSide {
+			a.newScroll = a.sideScrollToSideScroll(prev, prevScroll, newSide)
 			a.newScrollSet = true
 		}
+	default:
+		// prev == side == fullDiff => nothing
 	}
+
 	a.side = side
 }
 
