@@ -564,14 +564,6 @@ func numberedDiffLines(diff string) []displayLine {
 	newNo := 0
 	maxNo := 0
 	for _, line := range lines {
-		if oldStart, newStart, ok := parseHunkHeader(line); ok {
-			if oldStart > oldNo {
-				oldNo = oldStart
-			}
-			if newStart > newNo {
-				newNo = newStart
-			}
-		}
 		if oldNo > maxNo {
 			maxNo = oldNo
 		}
