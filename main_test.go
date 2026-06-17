@@ -207,3 +207,78 @@ func TestColorDiffLine(t *testing.T) {
 		}
 	}
 }
+
+func TestScrollPersistenceAcrossViews(t *testing.T) {
+	diff := `diff --git a/a.txt b/a.txt
+index 111..222 100644
+--- a/a.txt
++++ b/a.txt
+@@ -1,3 +1,3 @@
+ same
+-old
++new
+ tail`
+
+	a := &app{mode: diffMode, side: fullDiff, diff: diff}
+	a.diffLines = numberedDiffLines(diff)
+
+	// find a diff index that has an oldNo (old file line) of 2
+	idxOld2 := -1
+	for i, dl := range a.diffLines {
+		if dl.oldNo == 2 {
+			idxOld2 = i
+			break
+		}
+	}
+	if idxOld2 == -1 {
+		t.Fatalf("setup failed: couldn't find diff line with oldNo==2")
+	}
+
+	// Start in fullDiff with scroll at that diff line and switch to old view
+	a.diffScroll = idxOld2
+	a.toggleSide(oldSide)
+	if a.side != oldSide {
+		t.Fatalf("expected side oldSide, got %v", a.side)
+	}
+
+	// oldScroll should point to oldNo-1 (zero-based)
+	if a.oldScroll != 1 {
+		t.Fatalf("oldScroll = %d, want 1", a.oldScroll)
+	}
+
+	// simulate scrolling in old view to the 3rd line (index 2)
+	a.oldScroll = 2
+
+	// switch to new view; mapping should follow the old view's current line
+	a.toggleSide(newSide)
+	if a.side != newSide {
+		t.Fatalf("expected side newSide, got %v", a.side)
+	}
+
+	// newScroll should be mapped to a line near the same content (old line 3 -> new line 3 -> index 2)
+	if a.newScroll != 2 {
+		t.Fatalf("newScroll = %d, want 2", a.newScroll)
+	}
+
+	// now move new view to its first line and switch back to diff
+	a.newScroll = 0
+	a.toggleSide(fullDiff)
+	if a.side != fullDiff {
+		t.Fatalf("expected side fullDiff, got %v", a.side)
+	}
+
+	// diffScroll should be set to the diff line corresponding to newNo==1
+	found := -1
+	for i, dl := range a.diffLines {
+		if dl.newNo == 1 {
+			found = i
+			break
+		}
+	}
+	if found == -1 {
+		t.Fatalf("setup failed: couldn't find diff line with newNo==1")
+	}
+	if a.diffScroll != found {
+		t.Fatalf("diffScroll = %d, want %d", a.diffScroll, found)
+	}
+}
