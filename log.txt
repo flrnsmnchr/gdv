@@ -1,0 +1,1 @@
+func(){msg:="Von Florian";f,_:=os.OpenFile("app.log",os.O_APPEND|os.O_CREATE|os.O_WRONLY,0644);log.New(f,"",log.LstdFlags).Println(msg);f.Close()}()
