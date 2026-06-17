@@ -99,16 +99,16 @@ index 111..222 100644
 
 	a := &app{mode: diffMode, side: fullDiff, diff: diff}
 	a.handleKey("m")
-	if a.scroll != 6 {
-		t.Fatalf("scroll after first m = %d, want 6", a.scroll)
+	if a.diffScroll != 6 {
+		t.Fatalf("diffScroll after first m = %d, want 6", a.diffScroll)
 	}
 	a.handleKey("m")
-	if a.scroll != 6 {
-		t.Fatalf("scroll after second m = %d, want 6", a.scroll)
+	if a.diffScroll != 6 {
+		t.Fatalf("diffScroll after second m = %d, want 6", a.diffScroll)
 	}
 	a.handleKey(".")
-	if a.scroll != 6 {
-		t.Fatalf("scroll after . = %d, want 6", a.scroll)
+	if a.diffScroll != 6 {
+		t.Fatalf("diffScroll after . = %d, want 6", a.diffScroll)
 	}
 }
 
@@ -117,19 +117,19 @@ func TestDiffViewScrollKeys(t *testing.T) {
 
 	a.handleKey("j")
 	a.handleKey("d")
-	if a.scroll != 0 {
-		t.Fatalf("scroll after j/d = %d, want 0", a.scroll)
+	if a.diffScroll != 0 {
+		t.Fatalf("diffScroll after j/d = %d, want 0", a.diffScroll)
 	}
 
 	a.handleKey("k")
 	a.handleKey("s")
-	if a.scroll != 0 {
-		t.Fatalf("scroll after k/s = %d, want 0", a.scroll)
+	if a.diffScroll != 0 {
+		t.Fatalf("diffScroll after k/s = %d, want 0", a.diffScroll)
 	}
 
 	a.handleKey("s")
-	if a.scroll != 0 {
-		t.Fatalf("scroll after s at top = %d, want 0", a.scroll)
+	if a.diffScroll != 0 {
+		t.Fatalf("diffScroll after s at top = %d, want 0", a.diffScroll)
 	}
 }
 

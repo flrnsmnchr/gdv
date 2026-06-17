@@ -34,17 +34,29 @@ type fileEntry struct {
 	Old    string
 }
 
+type diffLine struct {
+	gutter string
+	text   string
+	oldNo  int
+	newNo  int
+}
+
 type app struct {
-	files     []fileEntry
-	selected  int
-	mode      mode
-	side      sideMode
-	diff      string
-	oldFile   string
-	newFile   string
-	scroll    int
-	statusMsg string
-	gui       *gocui.Gui
+	files        []fileEntry
+	selected     int
+	mode         mode
+	side         sideMode
+	diff         string
+	oldFile      string
+	newFile      string
+	diffLines    []diffLine
+	diffScroll   int
+	oldScroll    int
+	newScroll    int
+	oldScrollSet bool
+	newScrollSet bool
+	statusMsg    string
+	gui          *gocui.Gui
 }
 
 type displayLine struct {
@@ -207,20 +219,16 @@ func (a *app) handleKey(key string) bool {
 		a.statusMsg = ""
 	case "h", "s":
 		a.toggleSide(oldSide)
-		a.scroll = 0
 	case "l", "g":
 		a.toggleSide(newSide)
-		a.scroll = 0
 	case "m", "v":
 		a.nextHunk()
 	case ",", "c":
 		a.previousHunk()
 	case "j", "f", "down":
-		a.scroll++
+		a.incrementScroll()
 	case "k", "d", "up":
-		if a.scroll > 0 {
-			a.scroll--
-		}
+		a.decrementScroll()
 	}
 	return false
 }
@@ -231,8 +239,8 @@ func (a *app) nextHunk() {
 	}
 	offsets := diffHunkOffsets(a.diff)
 	for _, off := range offsets {
-		if off > a.scroll {
-			a.scroll = off
+		if off > a.diffScroll {
+			a.diffScroll = off
 			return
 		}
 	}
@@ -245,13 +253,13 @@ func (a *app) previousHunk() {
 	offsets := diffHunkOffsets(a.diff)
 	previous := -1
 	for _, off := range offsets {
-		if off >= a.scroll {
+		if off >= a.diffScroll {
 			break
 		}
 		previous = off
 	}
 	if previous >= 0 {
-		a.scroll = previous
+		a.diffScroll = previous
 	}
 }
 
@@ -283,12 +291,38 @@ func (a *app) toggleSide(side sideMode) {
 		a.side = fullDiff
 		return
 	}
+	a.switchToSide(side)
+}
+
+func (a *app) switchToSide(side sideMode) {
+	switch side {
+	case oldSide:
+		if a.side == fullDiff && !a.oldScrollSet {
+			a.oldScroll = a.diffScrollToSideScroll(oldSide)
+			a.oldScrollSet = true
+		} else if a.side == newSide && !a.oldScrollSet {
+			a.oldScroll = a.sideScrollToSideScroll(newSide, a.newScroll, oldSide)
+			a.oldScrollSet = true
+		}
+	case newSide:
+		if a.side == fullDiff && !a.newScrollSet {
+			a.newScroll = a.diffScrollToSideScroll(newSide)
+			a.newScrollSet = true
+		} else if a.side == oldSide && !a.newScrollSet {
+			a.newScroll = a.sideScrollToSideScroll(oldSide, a.oldScroll, newSide)
+			a.newScrollSet = true
+		}
+	}
 	a.side = side
 }
 
 func (a *app) openDiff() {
 	a.mode = diffMode
-	a.scroll = 0
+	a.diffScroll = 0
+	a.oldScroll = 0
+	a.newScroll = 0
+	a.oldScrollSet = false
+	a.newScrollSet = false
 	a.statusMsg = ""
 
 	if a.selected < 0 || a.selected >= len(a.files) {
@@ -308,6 +342,7 @@ func (a *app) openDiff() {
 		return
 	}
 	a.diff = diff
+	a.diffLines = numberedDiffLines(diff)
 	a.oldFile = loadOldFile(entry)
 	a.newFile = loadNewFile(entry)
 }
@@ -466,19 +501,96 @@ func (a *app) writeDiffContent(view *gocui.View) {
 		return
 	}
 
-	lines := a.diffDisplayLines()
-	if a.scroll > len(lines)-1 {
-		a.scroll = max(0, len(lines)-1)
+	if a.side == fullDiff {
+		if a.diffScroll > len(a.diffLines)-1 {
+			a.diffScroll = max(0, len(a.diffLines)-1)
+		}
+
+		lines := a.diffLines
+		if a.diffScroll > 0 {
+			lines = lines[a.diffScroll:]
+		}
+
+		for _, line := range lines {
+			text := colorDiffLine(renderableLine(line.text))
+			fmt.Fprintln(view, line.gutter+" "+text)
+		}
+		return
 	}
-	if a.scroll > 0 {
-		lines = lines[a.scroll:]
+
+	lines := a.diffDisplayLines()
+	scroll := a.currentScroll()
+	if scroll > len(lines)-1 {
+		scroll = max(0, len(lines)-1)
+		a.setCurrentScroll(scroll)
+	}
+	if scroll > 0 {
+		lines = lines[scroll:]
 	}
 	for _, line := range lines {
-		text := renderableLine(line.text)
-		if a.side == fullDiff {
-			text = colorDiffLine(text)
+		fmt.Fprintln(view, line.gutter+" "+renderableLine(line.text))
+	}
+}
+
+func (a *app) currentScroll() int {
+	switch a.side {
+	case oldSide:
+		return a.oldScroll
+	case newSide:
+		return a.newScroll
+	default:
+		return a.diffScroll
+	}
+}
+
+func (a *app) setCurrentScroll(scroll int) {
+	switch a.side {
+	case oldSide:
+		a.oldScroll = scroll
+		a.oldScrollSet = true
+	case newSide:
+		a.newScroll = scroll
+		a.newScrollSet = true
+	default:
+		a.diffScroll = scroll
+	}
+}
+
+func (a *app) incrementScroll() {
+	switch a.side {
+	case fullDiff:
+		if a.diffScroll < len(a.diffLines)-1 {
+			a.diffScroll++
 		}
-		fmt.Fprintln(view, line.gutter+" "+text)
+	case oldSide:
+		if a.oldScroll < len(a.diffDisplayLines())-1 {
+			a.oldScroll++
+			a.oldScrollSet = true
+		}
+	case newSide:
+		if a.newScroll < len(a.diffDisplayLines())-1 {
+			a.newScroll++
+			a.newScrollSet = true
+		}
+	}
+}
+
+func (a *app) decrementScroll() {
+	switch a.side {
+	case fullDiff:
+		if a.diffScroll > 0 {
+			a.diffScroll--
+		}
+	case oldSide:
+		if a.oldScroll > 0 {
+			a.oldScroll--
+			a.oldScrollSet = true
+		}
+	case newSide:
+		if a.newScroll > 0 {
+			a.newScroll--
+			a.newScrollSet = true
+		}
 	}
 }
 
@@ -489,8 +601,93 @@ func (a *app) diffDisplayLines() []displayLine {
 	case newSide:
 		return numberedFileLines(a.newFile, 1)
 	default:
-		return numberedDiffLines(a.diff)
+		return diffLinesToDisplayLines(a.diffLines)
 	}
+}
+
+func diffLinesToDisplayLines(lines []diffLine) []displayLine {
+	out := make([]displayLine, 0, len(lines))
+	for _, line := range lines {
+		out = append(out, displayLine{gutter: line.gutter, text: line.text})
+	}
+	return out
+}
+
+func (a *app) lineNoForSide(line diffLine, side sideMode) int {
+	if side == oldSide {
+		return line.oldNo
+	}
+	return line.newNo
+}
+
+func (a *app) diffScrollToSideScroll(side sideMode) int {
+	if len(a.diffLines) == 0 {
+		return 0
+	}
+
+	idx := a.diffScroll
+	if idx < 0 {
+		idx = 0
+	}
+	if idx >= len(a.diffLines) {
+		idx = len(a.diffLines) - 1
+	}
+
+	if no := a.lineNoForSide(a.diffLines[idx], side); no > 0 {
+		return no - 1
+	}
+
+	for i := idx + 1; i < len(a.diffLines); i++ {
+		if no := a.lineNoForSide(a.diffLines[i], side); no > 0 {
+			return no - 1
+		}
+	}
+	for i := idx - 1; i >= 0; i-- {
+		if no := a.lineNoForSide(a.diffLines[i], side); no > 0 {
+			return no - 1
+		}
+	}
+	return 0
+}
+
+func (a *app) sideScrollToDiffScroll(side sideMode, scroll int) int {
+	target := scroll + 1
+	bestAbove := -1
+
+	for i, line := range a.diffLines {
+		val := a.lineNoForSide(line, side)
+		if val == 0 {
+			continue
+		}
+		if val == target {
+			return i
+		}
+		if val > target {
+			bestAbove = i
+			break
+		}
+	}
+	if bestAbove != -1 {
+		return bestAbove
+	}
+
+	for i := len(a.diffLines) - 1; i >= 0; i-- {
+		if val := a.lineNoForSide(a.diffLines[i], side); val > 0 {
+			return i
+		}
+	}
+	return 0
+}
+
+func (a *app) sideScrollToSideScroll(fromSide sideMode, scroll int, toSide sideMode) int {
+	diffIdx := a.sideScrollToDiffScroll(fromSide, scroll)
+	if diffIdx < 0 || diffIdx >= len(a.diffLines) {
+		return 0
+	}
+	if no := a.lineNoForSide(a.diffLines[diffIdx], toSide); no > 0 {
+		return no - 1
+	}
+	return 0
 }
 
 func oldSource(diff string) string {
@@ -558,7 +755,7 @@ func numberedFileLines(content string, start int) []displayLine {
 	return out
 }
 
-func numberedDiffLines(diff string) []displayLine {
+func numberedDiffLines(diff string) []diffLine {
 	lines := strings.Split(strings.ReplaceAll(diff, "\r\n", "\n"), "\n")
 	oldNo := 0
 	newNo := 0
@@ -590,40 +787,44 @@ func numberedDiffLines(diff string) []displayLine {
 	width := numberWidth(maxNo)
 	oldNo = 0
 	newNo = 0
-	out := make([]displayLine, 0, len(lines))
+	out := make([]diffLine, 0, len(lines))
 	for _, line := range lines {
 		switch {
 		case strings.HasPrefix(line, "diff --git"), strings.HasPrefix(line, "index "), strings.HasPrefix(line, "---"), strings.HasPrefix(line, "+++"):
-			out = append(out, displayLine{gutter: blankDiffGutter(width), text: line})
+			out = append(out, diffLine{gutter: blankDiffGutter(width), text: line})
 		case strings.HasPrefix(line, "@@"):
 			if oldStart, newStart, ok := parseHunkHeader(line); ok {
 				oldNo = oldStart
 				newNo = newStart
 			}
-			out = append(out, displayLine{gutter: blankDiffGutter(width), text: line})
+			out = append(out, diffLine{gutter: blankDiffGutter(width), text: line})
 		case len(line) == 0:
-			out = append(out, displayLine{gutter: blankDiffGutter(width), text: line})
+			out = append(out, diffLine{gutter: blankDiffGutter(width), text: line})
 		case line[0] == ' ':
-			out = append(out, displayLine{
+			out = append(out, diffLine{
 				gutter: fmt.Sprintf("%*d | %*d", width, oldNo, width, newNo),
 				text:   line,
+				oldNo:  oldNo,
+				newNo:  newNo,
 			})
 			oldNo++
 			newNo++
 		case line[0] == '-':
-			out = append(out, displayLine{
+			out = append(out, diffLine{
 				gutter: fmt.Sprintf("%*d | %*s", width, oldNo, width, ""),
 				text:   line,
+				oldNo:  oldNo,
 			})
 			oldNo++
 		case line[0] == '+':
-			out = append(out, displayLine{
+			out = append(out, diffLine{
 				gutter: fmt.Sprintf("%*s | %*d", width, "", width, newNo),
 				text:   line,
+				newNo:  newNo,
 			})
 			newNo++
 		default:
-			out = append(out, displayLine{gutter: blankDiffGutter(width), text: line})
+			out = append(out, diffLine{gutter: blankDiffGutter(width), text: line})
 		}
 	}
 	return out
@@ -664,6 +865,13 @@ func numberWidth(maxNo int) int {
 
 func blankDiffGutter(width int) string {
 	return fmt.Sprintf("%*s | %*s", width, "", width, "")
+}
+
+func max(a, b int) int {
+	if a > b {
+		return a
+	}
+	return b
 }
 
 func colorDiffLine(line string) string {
