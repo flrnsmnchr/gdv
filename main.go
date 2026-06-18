@@ -6,6 +6,7 @@ import (
 
 	"gdv/git"
 	"gdv/state"
+	"gdv/ui"
 
 	"github.com/jroimartin/gocui"
 )
@@ -45,7 +46,7 @@ func run() error {
 	defer gui.Close()
 
 	appState.Gui = gui
-	gui.SetManagerFunc(func(g *gocui.Gui) error { return layout(appState, g) })
+	gui.SetManagerFunc(func(g *gocui.Gui) error { return ui.Layout(appState, g) })
 
 	if err := appState.SetKeybindings(); err != nil {
 		return err

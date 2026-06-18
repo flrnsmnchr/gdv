@@ -4,6 +4,7 @@ import (
 	difflib "gdv/diff"
 	gitlib "gdv/git"
 	"gdv/state"
+	"gdv/ui"
 	"testing"
 )
 
@@ -141,7 +142,7 @@ func TestDiffViewScrollKeys(t *testing.T) {
 }
 
 func TestRenderableLineExpandsTabs(t *testing.T) {
-	got := renderableLine("+\tvalue")
+	got := ui.RenderableLine("+\tvalue")
 	if got != "+    value" {
 		t.Fatalf("renderableLine = %q, want %q", got, "+    value")
 	}
@@ -209,7 +210,7 @@ func TestColorDiffLine(t *testing.T) {
 	}
 
 	for input, want := range tests {
-		if got := colorDiffLine(input); got != want {
+		if got := ui.ColorDiffLine(input); got != want {
 			t.Fatalf("colorDiffLine(%q) = %q, want %q", input, got, want)
 		}
 	}
