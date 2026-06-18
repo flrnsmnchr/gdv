@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"strings"
 
 	"gdv/diff"
@@ -251,6 +252,42 @@ func (a *app) diffDisplayLines() []displayLine {
 	default:
 		return diffLinesToDisplayLines(a.diffLines)
 	}
+}
+
+func diffLinesToDisplayLines(lines []diff.DiffLine) []displayLine {
+	out := make([]displayLine, 0, len(lines))
+	for _, line := range lines {
+		out = append(out, displayLine{gutter: line.Gutter, text: line.Text})
+	}
+	return out
+}
+
+func numberedFileLines(content string, start int) []displayLine {
+	lines := strings.Split(strings.ReplaceAll(content, "\r\n", "\n"), "\n")
+	width := numberWidth(start + len(lines) - 1)
+	out := make([]displayLine, 0, len(lines))
+	for i, line := range lines {
+		out = append(out, displayLine{
+			gutter: fmt.Sprintf("%*d", width, start+i),
+			text:   line,
+		})
+	}
+	return out
+}
+
+func numberWidth(maxNo int) int {
+	if maxNo < 1 {
+		return 1
+	}
+	width := 0
+	for maxNo > 0 {
+		width++
+		maxNo /= 10
+	}
+	if width < 4 {
+		return 4
+	}
+	return width
 }
 
 func (a *app) nextHunk() {
