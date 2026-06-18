@@ -44,7 +44,7 @@ func run() error {
 	defer gui.Close()
 
 	state.gui = gui
-	gui.SetManagerFunc(state.layout)
+	gui.SetManagerFunc(func(g *gocui.Gui) error { return layout(state, g) })
 
 	if err := state.setKeybindings(); err != nil {
 		return err

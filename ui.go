@@ -9,22 +9,22 @@ import (
 	"github.com/jroimartin/gocui"
 )
 
-func (a *app) layout(g *gocui.Gui) error {
+func layout(a *app, g *gocui.Gui) error {
 	maxX, maxY := g.Size()
 	if maxX < 20 || maxY < 8 {
-		return a.layoutSmall(g, maxX, maxY)
+		return layoutSmall(a, g, maxX, maxY)
 	}
 
-	if err := a.drawTitleView(g, maxX); err != nil {
+	if err := drawTitleView(a, g, maxX); err != nil {
 		return err
 	}
-	if err := a.drawMainView(g, maxX, maxY); err != nil {
+	if err := drawMainView(a, g, maxX, maxY); err != nil {
 		return err
 	}
-	return a.drawStatusView(g, maxX, maxY)
+	return drawStatusView(a, g, maxX, maxY)
 }
 
-func (a *app) layoutSmall(g *gocui.Gui, maxX, maxY int) error {
+func layoutSmall(a *app, g *gocui.Gui, maxX, maxY int) error {
 	view, err := g.SetView("main", 0, 0, maxX-1, maxY-1)
 	if err != nil && err != gocui.ErrUnknownView {
 		return err
@@ -35,7 +35,7 @@ func (a *app) layoutSmall(g *gocui.Gui, maxX, maxY int) error {
 	return nil
 }
 
-func (a *app) drawTitleView(g *gocui.Gui, maxX int) error {
+func drawTitleView(a *app, g *gocui.Gui, maxX int) error {
 	view, err := g.SetView("title", 0, 0, maxX-1, 2)
 	if err != nil && err != gocui.ErrUnknownView {
 		return err
@@ -57,7 +57,7 @@ func (a *app) drawTitleView(g *gocui.Gui, maxX int) error {
 	return nil
 }
 
-func (a *app) drawMainView(g *gocui.Gui, maxX, maxY int) error {
+func drawMainView(a *app, g *gocui.Gui, maxX, maxY int) error {
 	view, err := g.SetView("main", 0, 3, maxX-1, maxY-4)
 	if err != nil && err != gocui.ErrUnknownView {
 		return err
@@ -71,14 +71,14 @@ func (a *app) drawMainView(g *gocui.Gui, maxX, maxY int) error {
 	view.Clear()
 
 	if a.mode == statusMode {
-		a.writeStatusContent(view, maxY-8)
+		writeStatusContent(a, view, maxY-8)
 		return nil
 	}
-	a.writeDiffContent(view)
+	writeDiffContent(a, view)
 	return nil
 }
 
-func (a *app) drawStatusView(g *gocui.Gui, maxX, maxY int) error {
+func drawStatusView(a *app, g *gocui.Gui, maxX, maxY int) error {
 	view, err := g.SetView("status", 0, maxY-3, maxX-1, maxY-1)
 	if err != nil && err != gocui.ErrUnknownView {
 		return err
@@ -94,7 +94,7 @@ func (a *app) drawStatusView(g *gocui.Gui, maxX, maxY int) error {
 	return nil
 }
 
-func (a *app) writeStatusContent(view *gocui.View, maxRows int) {
+func writeStatusContent(a *app, view *gocui.View, maxRows int) {
 	if len(a.files) == 0 {
 		fmt.Fprintln(view, "No changed files.")
 		return
@@ -121,7 +121,7 @@ func (a *app) writeStatusContent(view *gocui.View, maxRows int) {
 	}
 }
 
-func (a *app) writeDiffContent(view *gocui.View) {
+func writeDiffContent(a *app, view *gocui.View) {
 	if a.statusMsg != "" {
 		fmt.Fprintln(view, a.statusMsg)
 		return
