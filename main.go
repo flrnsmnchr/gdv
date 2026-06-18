@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"os"
 
+	"gdv/git"
+
 	"github.com/jroimartin/gocui"
 )
 
@@ -15,16 +17,25 @@ func main() {
 }
 
 func run() error {
-	if err := ensureGitRepo(); err != nil {
+	if err := git.EnsureGitRepo(); err != nil {
 		return err
 	}
 
-	files, err := loadStatus()
+	files, err := git.LoadStatus()
 	if err != nil {
 		return err
 	}
 
-	state := &app{files: files}
+	fileEntries := make([]fileEntry, len(files))
+	for i, f := range files {
+		fileEntries[i] = fileEntry{
+			Status: f.Status,
+			Path:   f.Path,
+			Old:    f.Old,
+		}
+	}
+
+	state := &app{files: fileEntries}
 
 	gui, err := gocui.NewGui(gocui.OutputNormal)
 	if err != nil {

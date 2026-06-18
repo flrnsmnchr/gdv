@@ -2,12 +2,13 @@ package main
 
 import (
 	difflib "gdv/diff"
+	gitlib "gdv/git"
 	"testing"
 )
 
 func TestParseStatus(t *testing.T) {
 	input := []byte(" M main.go\x00A  new.go\x00R  renamed.go\x00old.go\x00")
-	got := parseStatus(input)
+	got := gitlib.ParseStatus(input)
 
 	if len(got) != 3 {
 		t.Fatalf("len = %d, want 3", len(got))
@@ -146,9 +147,9 @@ func TestRenderableLineExpandsTabs(t *testing.T) {
 }
 
 func TestGitPathNormalizesWindowsSeparators(t *testing.T) {
-	got := gitPath(`dir\file.txt`)
+	got := gitlib.NormalizePath(`dir\file.txt`)
 	if got != "dir/file.txt" {
-		t.Fatalf("gitPath = %q, want %q", got, "dir/file.txt")
+		t.Fatalf("NormalizePath = %q, want %q", got, "dir/file.txt")
 	}
 }
 

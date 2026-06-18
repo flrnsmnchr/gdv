@@ -4,6 +4,7 @@ import (
 	"strings"
 
 	"gdv/diff"
+	"gdv/git"
 
 	"github.com/jroimartin/gocui"
 )
@@ -158,7 +159,7 @@ func (a *app) openDiff() {
 	}
 
 	entry := a.files[a.selected]
-	diffData, err := loadDiff(entry.Path)
+	diffData, err := git.LoadDiff(entry.Path)
 	if err != nil {
 		a.diff = ""
 		a.statusMsg = err.Error()
@@ -170,8 +171,13 @@ func (a *app) openDiff() {
 	}
 	a.diff = diffData
 	a.diffLines = diff.NumberedDiffLines(a.diff)
-	a.oldFile = loadOldFile(entry)
-	a.newFile = loadNewFile(entry)
+	gitEntry := git.FileEntry{
+		Status: entry.Status,
+		Path:   entry.Path,
+		Old:    entry.Old,
+	}
+	a.oldFile = git.LoadOldFile(gitEntry)
+	a.newFile = git.LoadNewFile(gitEntry)
 }
 
 func (a *app) currentScroll() int {
