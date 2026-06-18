@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"strings"
 
+	"gdv/diff"
+
 	"github.com/jroimartin/gocui"
 )
 
@@ -136,8 +138,8 @@ func (a *app) writeDiffContent(view *gocui.View) {
 		}
 
 		for _, line := range lines {
-			text := colorDiffLine(renderableLine(line.text))
-			fmt.Fprintln(view, line.gutter+" "+text)
+			text := colorDiffLine(renderableLine(line.Text))
+			fmt.Fprintln(view, line.Gutter+" "+text)
 		}
 		return
 	}
@@ -156,10 +158,10 @@ func (a *app) writeDiffContent(view *gocui.View) {
 	}
 }
 
-func diffLinesToDisplayLines(lines []diffLine) []displayLine {
+func diffLinesToDisplayLines(lines []diff.DiffLine) []displayLine {
 	out := make([]displayLine, 0, len(lines))
 	for _, line := range lines {
-		out = append(out, displayLine{gutter: line.gutter, text: line.text})
+		out = append(out, displayLine{gutter: line.Gutter, text: line.Text})
 	}
 	return out
 }

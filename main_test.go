@@ -1,6 +1,9 @@
 package main
 
-import "testing"
+import (
+	difflib "gdv/diff"
+	"testing"
+)
 
 func TestParseStatus(t *testing.T) {
 	input := []byte(" M main.go\x00A  new.go\x00R  renamed.go\x00old.go\x00")
@@ -31,14 +34,14 @@ index 111..222 100644
 +new
  tail`
 
-	old := oldSource(diff)
+	old := difflib.OldSource(diff)
 	if old != "same\nold\ntail" {
-		t.Fatalf("oldSource = %q", old)
+		t.Fatalf("OldSource = %q", old)
 	}
 
-	new := newSource(diff)
+	new := difflib.NewSource(diff)
 	if new != "same\nnew\ntail" {
-		t.Fatalf("newSource = %q", new)
+		t.Fatalf("NewSource = %q", new)
 	}
 }
 
@@ -76,7 +79,7 @@ index 111..222 100644
 @@ -5,1 +5,1 @@
  tail`
 
-	got := diffHunkOffsets(diff)
+	got := difflib.DiffHunkOffsets(diff)
 	if len(got) != 1 {
 		t.Fatalf("len = %d, want 1", len(got))
 	}
@@ -98,6 +101,7 @@ index 111..222 100644
  tail`
 
 	a := &app{mode: diffMode, side: fullDiff, diff: diff}
+	a.diffLines = difflib.NumberedDiffLines(diff)
 	a.handleKey("m")
 	if a.diffScroll != 6 {
 		t.Fatalf("diffScroll after first m = %d, want 6", a.diffScroll)
@@ -115,6 +119,7 @@ index 111..222 100644
 func TestDiffViewScrollKeys(t *testing.T) {
 	a := &app{mode: diffMode}
 
+	a.diffLines = difflib.NumberedDiffLines("diff --git a/a.txt b/a.txt\nindex 111..222 100644\n--- a/a.txt\n+++ b/a.txt\n@@ -1,1 +1,1 @@\n same\n-old\n+new")
 	a.handleKey("j")
 	a.handleKey("d")
 	if a.diffScroll != 0 {
@@ -122,14 +127,14 @@ func TestDiffViewScrollKeys(t *testing.T) {
 	}
 
 	a.handleKey("k")
-	a.handleKey("s")
+	a.handleKey("d")
 	if a.diffScroll != 0 {
-		t.Fatalf("diffScroll after k/s = %d, want 0", a.diffScroll)
+		t.Fatalf("diffScroll after k/d = %d, want 0", a.diffScroll)
 	}
 
-	a.handleKey("s")
+	a.handleKey("k")
 	if a.diffScroll != 0 {
-		t.Fatalf("diffScroll after s at top = %d, want 0", a.diffScroll)
+		t.Fatalf("diffScroll after k at top = %d, want 0", a.diffScroll)
 	}
 }
 
@@ -171,23 +176,23 @@ index 111..222 100644
 +new
  tail`
 
-	got := numberedDiffLines(diff)
+	got := difflib.NumberedDiffLines(diff)
 	if len(got) != 9 {
 		t.Fatalf("len = %d, want 9", len(got))
 	}
-	if got[4].text != "@@ -1,3 +1,3 @@" {
+	if got[4].Text != "@@ -1,3 +1,3 @@" {
 		t.Fatalf("hunk header = %#v", got[4])
 	}
-	if got[5].gutter != "   1 |    1" || got[5].text != " same" {
+	if got[5].Gutter != "   1 |    1" || got[5].Text != " same" {
 		t.Fatalf("context line = %#v", got[5])
 	}
-	if got[6].gutter != "   2 |     " || got[6].text != "-old" {
+	if got[6].Gutter != "   2 |     " || got[6].Text != "-old" {
 		t.Fatalf("deleted line = %#v", got[6])
 	}
-	if got[7].gutter != "     |    2" || got[7].text != "+new" {
+	if got[7].Gutter != "     |    2" || got[7].Text != "+new" {
 		t.Fatalf("added line = %#v", got[7])
 	}
-	if got[8].gutter != "   3 |    3" || got[8].text != " tail" {
+	if got[8].Gutter != "   3 |    3" || got[8].Text != " tail" {
 		t.Fatalf("tail line = %#v", got[8])
 	}
 }
@@ -220,12 +225,12 @@ index 111..222 100644
  tail`
 
 	a := &app{mode: diffMode, side: fullDiff, diff: diff}
-	a.diffLines = numberedDiffLines(diff)
+	a.diffLines = difflib.NumberedDiffLines(diff)
 
 	// find a diff index that has an oldNo (old file line) of 2
 	idxOld2 := -1
 	for i, dl := range a.diffLines {
-		if dl.oldNo == 2 {
+		if dl.OldNo == 2 {
 			idxOld2 = i
 			break
 		}
@@ -270,7 +275,7 @@ index 111..222 100644
 	// diffScroll should be set to the diff line corresponding to newNo==1
 	found := -1
 	for i, dl := range a.diffLines {
-		if dl.newNo == 1 {
+		if dl.NewNo == 1 {
 			found = i
 			break
 		}

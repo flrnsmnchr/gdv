@@ -3,6 +3,8 @@ package main
 import (
 	"strings"
 
+	"gdv/diff"
+
 	"github.com/jroimartin/gocui"
 )
 
@@ -27,13 +29,6 @@ type fileEntry struct {
 	Old    string
 }
 
-type diffLine struct {
-	gutter string
-	text   string
-	oldNo  int
-	newNo  int
-}
-
 type displayLine struct {
 	gutter string
 	text   string
@@ -47,7 +42,7 @@ type app struct {
 	diff         string
 	oldFile      string
 	newFile      string
-	diffLines    []diffLine
+	diffLines    []diff.DiffLine
 	diffScroll   int
 	oldScroll    int
 	newScroll    int
@@ -163,18 +158,18 @@ func (a *app) openDiff() {
 	}
 
 	entry := a.files[a.selected]
-	diff, err := loadDiff(entry.Path)
+	diffData, err := loadDiff(entry.Path)
 	if err != nil {
 		a.diff = ""
 		a.statusMsg = err.Error()
 		return
 	}
-	if strings.TrimSpace(diff) == "" {
+	if strings.TrimSpace(diffData) == "" {
 		a.diff = "(no unstaged or committed diff for this file)"
 		return
 	}
-	a.diff = diff
-	a.diffLines = numberedDiffLines(diff)
+	a.diff = diffData
+	a.diffLines = diff.NumberedDiffLines(a.diff)
 	a.oldFile = loadOldFile(entry)
 	a.newFile = loadNewFile(entry)
 }
@@ -256,7 +251,7 @@ func (a *app) nextHunk() {
 	if a.mode != diffMode || a.side != fullDiff || a.diff == "" {
 		return
 	}
-	offsets := diffHunkOffsets(a.diff)
+	offsets := diff.DiffHunkOffsets(a.diff)
 	for _, off := range offsets {
 		if off > a.diffScroll {
 			a.diffScroll = off
@@ -269,7 +264,7 @@ func (a *app) previousHunk() {
 	if a.mode != diffMode || a.side != fullDiff || a.diff == "" {
 		return
 	}
-	offsets := diffHunkOffsets(a.diff)
+	offsets := diff.DiffHunkOffsets(a.diff)
 	previous := -1
 	for _, off := range offsets {
 		if off >= a.diffScroll {
@@ -318,11 +313,11 @@ func (a *app) switchToSide(side sideMode) {
 	a.side = side
 }
 
-func (a *app) lineNoForSide(line diffLine, side sideMode) int {
+func (a *app) lineNoForSide(line diff.DiffLine, side sideMode) int {
 	if side == oldSide {
-		return line.oldNo
+		return line.OldNo
 	}
-	return line.newNo
+	return line.NewNo
 }
 
 func (a *app) diffScrollToSideScroll(side sideMode) int {
