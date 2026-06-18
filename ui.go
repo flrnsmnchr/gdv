@@ -4,10 +4,12 @@ import (
 	"fmt"
 	"strings"
 
+	"gdv/state"
+
 	"github.com/jroimartin/gocui"
 )
 
-func layout(a *app, g *gocui.Gui) error {
+func layout(a *state.App, g *gocui.Gui) error {
 	maxX, maxY := g.Size()
 	if maxX < 20 || maxY < 8 {
 		return layoutSmall(a, g, maxX, maxY)
@@ -22,7 +24,7 @@ func layout(a *app, g *gocui.Gui) error {
 	return drawStatusView(a, g, maxX, maxY)
 }
 
-func layoutSmall(a *app, g *gocui.Gui, maxX, maxY int) error {
+func layoutSmall(a *state.App, g *gocui.Gui, maxX, maxY int) error {
 	view, err := g.SetView("main", 0, 0, maxX-1, maxY-1)
 	if err != nil && err != gocui.ErrUnknownView {
 		return err
@@ -33,7 +35,7 @@ func layoutSmall(a *app, g *gocui.Gui, maxX, maxY int) error {
 	return nil
 }
 
-func drawTitleView(a *app, g *gocui.Gui, maxX int) error {
+func drawTitleView(a *state.App, g *gocui.Gui, maxX int) error {
 	view, err := g.SetView("title", 0, 0, maxX-1, 2)
 	if err != nil && err != gocui.ErrUnknownView {
 		return err
@@ -41,34 +43,34 @@ func drawTitleView(a *app, g *gocui.Gui, maxX int) error {
 
 	view.Title = " gdv "
 	view.Clear()
-	if a.mode == statusMode {
+	if a.Mode == state.StatusMode {
 		fmt.Fprintf(view, "Changed files")
-		if len(a.files) > 0 {
-			fmt.Fprintf(view, " (%d)", len(a.files))
+		if len(a.Files) > 0 {
+			fmt.Fprintf(view, " (%d)", len(a.Files))
 		}
 		return nil
 	}
 
-	if a.selected >= 0 && a.selected < len(a.files) {
-		fmt.Fprint(view, a.files[a.selected].Path)
+	if a.Selected >= 0 && a.Selected < len(a.Files) {
+		fmt.Fprint(view, a.Files[a.Selected].Path)
 	}
 	return nil
 }
 
-func drawMainView(a *app, g *gocui.Gui, maxX, maxY int) error {
+func drawMainView(a *state.App, g *gocui.Gui, maxX, maxY int) error {
 	view, err := g.SetView("main", 0, 3, maxX-1, maxY-4)
 	if err != nil && err != gocui.ErrUnknownView {
 		return err
 	}
 
 	view.Title = " files "
-	if a.mode == diffMode {
+	if a.Mode == state.DiffMode {
 		view.Title = " diff "
 	}
 	view.Wrap = false
 	view.Clear()
 
-	if a.mode == statusMode {
+	if a.Mode == state.StatusMode {
 		writeStatusContent(a, view, maxY-8)
 		return nil
 	}
@@ -76,7 +78,7 @@ func drawMainView(a *app, g *gocui.Gui, maxX, maxY int) error {
 	return nil
 }
 
-func drawStatusView(a *app, g *gocui.Gui, maxX, maxY int) error {
+func drawStatusView(a *state.App, g *gocui.Gui, maxX, maxY int) error {
 	view, err := g.SetView("status", 0, maxY-3, maxX-1, maxY-1)
 	if err != nil && err != gocui.ErrUnknownView {
 		return err
@@ -84,7 +86,7 @@ func drawStatusView(a *app, g *gocui.Gui, maxX, maxY int) error {
 
 	view.Title = " keys "
 	view.Clear()
-	if a.mode == statusMode {
+	if a.Mode == state.StatusMode {
 		fmt.Fprint(view, "j/f/down move down  k/d/up move up  enter/space open diff  q/esc quit")
 		return nil
 	}
@@ -92,23 +94,23 @@ func drawStatusView(a *app, g *gocui.Gui, maxX, maxY int) error {
 	return nil
 }
 
-func writeStatusContent(a *app, view *gocui.View, maxRows int) {
-	if len(a.files) == 0 {
+func writeStatusContent(a *state.App, view *gocui.View, maxRows int) {
+	if len(a.Files) == 0 {
 		fmt.Fprintln(view, "No changed files.")
 		return
 	}
 
 	start := 0
-	if maxRows > 0 && a.selected >= maxRows {
-		start = a.selected - maxRows + 1
+	if maxRows > 0 && a.Selected >= maxRows {
+		start = a.Selected - maxRows + 1
 	}
-	for i := start; i < len(a.files); i++ {
+	for i := start; i < len(a.Files); i++ {
 		if maxRows > 0 && i >= start+maxRows {
 			break
 		}
-		file := a.files[i]
+		file := a.Files[i]
 		prefix := "  "
-		if i == a.selected {
+		if i == a.Selected {
 			prefix = "> "
 		}
 		line := fmt.Sprintf("%s%s %s", prefix, file.Status, file.Path)
@@ -119,20 +121,20 @@ func writeStatusContent(a *app, view *gocui.View, maxRows int) {
 	}
 }
 
-func writeDiffContent(a *app, view *gocui.View) {
-	if a.statusMsg != "" {
-		fmt.Fprintln(view, a.statusMsg)
+func writeDiffContent(a *state.App, view *gocui.View) {
+	if a.StatusMsg != "" {
+		fmt.Fprintln(view, a.StatusMsg)
 		return
 	}
 
-	if a.side == fullDiff {
-		if a.diffScroll > len(a.diffLines)-1 {
-			a.diffScroll = max(0, len(a.diffLines)-1)
+	if a.Side == state.FullDiff {
+		if a.DiffScroll > len(a.DiffLines)-1 {
+			a.DiffScroll = max(0, len(a.DiffLines)-1)
 		}
 
-		lines := a.diffLines
-		if a.diffScroll > 0 {
-			lines = lines[a.diffScroll:]
+		lines := a.DiffLines
+		if a.DiffScroll > 0 {
+			lines = lines[a.DiffScroll:]
 		}
 
 		for _, line := range lines {
@@ -142,17 +144,17 @@ func writeDiffContent(a *app, view *gocui.View) {
 		return
 	}
 
-	lines := a.diffDisplayLines()
-	scroll := a.currentScroll()
+	lines := a.DiffDisplayLines()
+	scroll := a.CurrentScroll()
 	if scroll > len(lines)-1 {
 		scroll = max(0, len(lines)-1)
-		a.setCurrentScroll(scroll)
+		a.SetCurrentScroll(scroll)
 	}
 	if scroll > 0 {
 		lines = lines[scroll:]
 	}
 	for _, line := range lines {
-		fmt.Fprintln(view, line.gutter+" "+renderableLine(line.text))
+		fmt.Fprintln(view, line.Gutter+" "+renderableLine(line.Text))
 	}
 }
 

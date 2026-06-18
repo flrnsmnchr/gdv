@@ -3,6 +3,7 @@ package main
 import (
 	difflib "gdv/diff"
 	gitlib "gdv/git"
+	"gdv/state"
 	"testing"
 )
 
@@ -47,24 +48,24 @@ index 111..222 100644
 }
 
 func TestSideViewKeysToggleBackToFullDiff(t *testing.T) {
-	a := &app{mode: diffMode}
+	a := &state.App{Mode: state.DiffMode}
 
-	a.handleKey("h")
-	if a.side != oldSide {
-		t.Fatalf("side after h = %v, want oldSide", a.side)
+	a.HandleKey("h")
+	if a.Side != state.OldSide {
+		t.Fatalf("side after h = %v, want OldSide", a.Side)
 	}
-	a.handleKey("h")
-	if a.side != fullDiff {
-		t.Fatalf("side after second h = %v, want fullDiff", a.side)
+	a.HandleKey("h")
+	if a.Side != state.FullDiff {
+		t.Fatalf("side after second h = %v, want FullDiff", a.Side)
 	}
 
-	a.handleKey("l")
-	if a.side != newSide {
-		t.Fatalf("side after l = %v, want newSide", a.side)
+	a.HandleKey("l")
+	if a.Side != state.NewSide {
+		t.Fatalf("side after l = %v, want NewSide", a.Side)
 	}
-	a.handleKey("l")
-	if a.side != fullDiff {
-		t.Fatalf("side after second l = %v, want fullDiff", a.side)
+	a.HandleKey("l")
+	if a.Side != state.FullDiff {
+		t.Fatalf("side after second l = %v, want FullDiff", a.Side)
 	}
 }
 
@@ -101,41 +102,41 @@ index 111..222 100644
 @@ -5,1 +5,1 @@
  tail`
 
-	a := &app{mode: diffMode, side: fullDiff, diff: diff}
-	a.diffLines = difflib.NumberedDiffLines(diff)
-	a.handleKey("m")
-	if a.diffScroll != 6 {
-		t.Fatalf("diffScroll after first m = %d, want 6", a.diffScroll)
+	a := &state.App{Mode: state.DiffMode, Side: state.FullDiff, Diff: diff}
+	a.DiffLines = difflib.NumberedDiffLines(diff)
+	a.HandleKey("m")
+	if a.DiffScroll != 6 {
+		t.Fatalf("diffScroll after first m = %d, want 6", a.DiffScroll)
 	}
-	a.handleKey("m")
-	if a.diffScroll != 6 {
-		t.Fatalf("diffScroll after second m = %d, want 6", a.diffScroll)
+	a.HandleKey("m")
+	if a.DiffScroll != 6 {
+		t.Fatalf("diffScroll after second m = %d, want 6", a.DiffScroll)
 	}
-	a.handleKey(".")
-	if a.diffScroll != 6 {
-		t.Fatalf("diffScroll after . = %d, want 6", a.diffScroll)
+	a.HandleKey(".")
+	if a.DiffScroll != 6 {
+		t.Fatalf("diffScroll after . = %d, want 6", a.DiffScroll)
 	}
 }
 
 func TestDiffViewScrollKeys(t *testing.T) {
-	a := &app{mode: diffMode}
+	a := &state.App{Mode: state.DiffMode}
 
-	a.diffLines = difflib.NumberedDiffLines("diff --git a/a.txt b/a.txt\nindex 111..222 100644\n--- a/a.txt\n+++ b/a.txt\n@@ -1,1 +1,1 @@\n same\n-old\n+new")
-	a.handleKey("j")
-	a.handleKey("d")
-	if a.diffScroll != 0 {
-		t.Fatalf("diffScroll after j/d = %d, want 0", a.diffScroll)
+	a.DiffLines = difflib.NumberedDiffLines("diff --git a/a.txt b/a.txt\nindex 111..222 100644\n--- a/a.txt\n+++ b/a.txt\n@@ -1,1 +1,1 @@\n same\n-old\n+new")
+	a.HandleKey("j")
+	a.HandleKey("d")
+	if a.DiffScroll != 0 {
+		t.Fatalf("diffScroll after j/d = %d, want 0", a.DiffScroll)
 	}
 
-	a.handleKey("k")
-	a.handleKey("d")
-	if a.diffScroll != 0 {
-		t.Fatalf("diffScroll after k/d = %d, want 0", a.diffScroll)
+	a.HandleKey("k")
+	a.HandleKey("d")
+	if a.DiffScroll != 0 {
+		t.Fatalf("diffScroll after k/d = %d, want 0", a.DiffScroll)
 	}
 
-	a.handleKey("k")
-	if a.diffScroll != 0 {
-		t.Fatalf("diffScroll after k at top = %d, want 0", a.diffScroll)
+	a.HandleKey("k")
+	if a.DiffScroll != 0 {
+		t.Fatalf("diffScroll after k at top = %d, want 0", a.DiffScroll)
 	}
 }
 
@@ -154,14 +155,14 @@ func TestGitPathNormalizesWindowsSeparators(t *testing.T) {
 }
 
 func TestNumberedFileLines(t *testing.T) {
-	got := numberedFileLines("alpha\nbeta", 1)
+	got := state.NumberedFileLines("alpha\nbeta", 1)
 	if len(got) != 2 {
 		t.Fatalf("len = %d, want 2", len(got))
 	}
-	if got[0].gutter != "   1" || got[0].text != "alpha" {
+	if got[0].Gutter != "   1" || got[0].Text != "alpha" {
 		t.Fatalf("first line = %#v", got[0])
 	}
-	if got[1].gutter != "   2" || got[1].text != "beta" {
+	if got[1].Gutter != "   2" || got[1].Text != "beta" {
 		t.Fatalf("second line = %#v", got[1])
 	}
 }
@@ -225,12 +226,12 @@ index 111..222 100644
 +new
  tail`
 
-	a := &app{mode: diffMode, side: fullDiff, diff: diff}
-	a.diffLines = difflib.NumberedDiffLines(diff)
+	a := &state.App{Mode: state.DiffMode, Side: state.FullDiff, Diff: diff}
+	a.DiffLines = difflib.NumberedDiffLines(diff)
 
 	// find a diff index that has an oldNo (old file line) of 2
 	idxOld2 := -1
-	for i, dl := range a.diffLines {
+	for i, dl := range a.DiffLines {
 		if dl.OldNo == 2 {
 			idxOld2 = i
 			break
@@ -241,41 +242,41 @@ index 111..222 100644
 	}
 
 	// Start in fullDiff with scroll at that diff line and switch to old view
-	a.diffScroll = idxOld2
-	a.toggleSide(oldSide)
-	if a.side != oldSide {
-		t.Fatalf("expected side oldSide, got %v", a.side)
+	a.DiffScroll = idxOld2
+	a.ToggleSide(state.OldSide)
+	if a.Side != state.OldSide {
+		t.Fatalf("expected side OldSide, got %v", a.Side)
 	}
 
 	// oldScroll should point to oldNo-1 (zero-based)
-	if a.oldScroll != 1 {
-		t.Fatalf("oldScroll = %d, want 1", a.oldScroll)
+	if a.OldScroll != 1 {
+		t.Fatalf("oldScroll = %d, want 1", a.OldScroll)
 	}
 
 	// simulate scrolling in old view to the 3rd line (index 2)
-	a.oldScroll = 2
+	a.OldScroll = 2
 
 	// switch to new view; mapping should follow the old view's current line
-	a.toggleSide(newSide)
-	if a.side != newSide {
-		t.Fatalf("expected side newSide, got %v", a.side)
+	a.ToggleSide(state.NewSide)
+	if a.Side != state.NewSide {
+		t.Fatalf("expected side NewSide, got %v", a.Side)
 	}
 
 	// newScroll should be mapped to a line near the same content (old line 3 -> new line 3 -> index 2)
-	if a.newScroll != 2 {
-		t.Fatalf("newScroll = %d, want 2", a.newScroll)
+	if a.NewScroll != 2 {
+		t.Fatalf("newScroll = %d, want 2", a.NewScroll)
 	}
 
 	// now move new view to its first line and switch back to diff
-	a.newScroll = 0
-	a.toggleSide(fullDiff)
-	if a.side != fullDiff {
-		t.Fatalf("expected side fullDiff, got %v", a.side)
+	a.NewScroll = 0
+	a.ToggleSide(state.FullDiff)
+	if a.Side != state.FullDiff {
+		t.Fatalf("expected side FullDiff, got %v", a.Side)
 	}
 
 	// diffScroll should be set to the diff line corresponding to newNo==1
 	found := -1
-	for i, dl := range a.diffLines {
+	for i, dl := range a.DiffLines {
 		if dl.NewNo == 1 {
 			found = i
 			break
@@ -284,7 +285,7 @@ index 111..222 100644
 	if found == -1 {
 		t.Fatalf("setup failed: couldn't find diff line with newNo==1")
 	}
-	if a.diffScroll != found {
-		t.Fatalf("diffScroll = %d, want %d", a.diffScroll, found)
+	if a.DiffScroll != found {
+		t.Fatalf("diffScroll = %d, want %d", a.DiffScroll, found)
 	}
 }

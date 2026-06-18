@@ -5,6 +5,7 @@ import (
 	"os"
 
 	"gdv/git"
+	"gdv/state"
 
 	"github.com/jroimartin/gocui"
 )
@@ -26,16 +27,16 @@ func run() error {
 		return err
 	}
 
-	fileEntries := make([]fileEntry, len(files))
+	fileEntries := make([]state.FileEntry, len(files))
 	for i, f := range files {
-		fileEntries[i] = fileEntry{
+		fileEntries[i] = state.FileEntry{
 			Status: f.Status,
 			Path:   f.Path,
 			Old:    f.Old,
 		}
 	}
 
-	state := &app{files: fileEntries}
+	appState := &state.App{Files: fileEntries}
 
 	gui, err := gocui.NewGui(gocui.OutputNormal)
 	if err != nil {
@@ -43,10 +44,10 @@ func run() error {
 	}
 	defer gui.Close()
 
-	state.gui = gui
-	gui.SetManagerFunc(func(g *gocui.Gui) error { return layout(state, g) })
+	appState.Gui = gui
+	gui.SetManagerFunc(func(g *gocui.Gui) error { return layout(appState, g) })
 
-	if err := state.setKeybindings(); err != nil {
+	if err := appState.SetKeybindings(); err != nil {
 		return err
 	}
 	if err := gui.MainLoop(); err != nil && err != gocui.ErrQuit {
