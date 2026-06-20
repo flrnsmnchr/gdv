@@ -7,6 +7,13 @@ import (
 	"strings"
 )
 
+type DiffLine struct {
+	Gutter string
+	Text   string
+	OldNo  int
+	NewNo  int
+}
+
 var hunkHeaderRE = regexp.MustCompile(`^@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@`)
 
 func NumberedDiffLines(diff string) []DiffLine {
@@ -173,11 +180,4 @@ func numberWidth(maxNo int) int {
 
 func blankDiffGutter(width int) string {
 	return fmt.Sprintf("%*s | %*s", width, "", width, "")
-}
-
-type DiffLine struct {
-	Gutter string
-	Text   string
-	OldNo  int
-	NewNo  int
 }
